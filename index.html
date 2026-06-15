@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <title>Votar Rota</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #22c55e;
+      --accent-dark: #16a34a;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+      min-height: 100%;
+    }
+    main {
+      width: 100%;
+      max-width: 420px;
+    }
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+    p.sub {
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 28px;
+      font-size: 0.95rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    label {
+      font-size: 0.9rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    input {
+      width: 100%;
+      font-size: 1.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 18px 20px;
+      border-radius: 14px;
+      border: 2px solid var(--border);
+      background: #0b1220;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: var(--accent); }
+    input::placeholder {
+      color: #475569;
+      font-weight: 600;
+      text-transform: none;
+    }
+    button {
+      width: 100%;
+      font-size: 1.25rem;
+      font-weight: 700;
+      padding: 20px;
+      border-radius: 14px;
+      border: none;
+      background: var(--accent);
+      color: #04130a;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button:hover { background: var(--accent-dark); }
+    button:active { transform: scale(0.98); }
+    button:disabled {
+      background: var(--border);
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+    .hint {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>🚗 Votar Rota</h1>
+    <p class="sub">Digite a rota e abra o formulário já preenchido.</p>
+    <form class="card" id="form" autocomplete="off">
+      <div>
+        <label for="rota">Rota</label>
+        <input
+          id="rota"
+          name="rota"
+          type="text"
+          inputmode="text"
+          placeholder="ex.: 1234"
+          autocapitalize="characters"
+          autofocus
+          required
+        >
+      </div>
+      <button type="submit" id="botao">Abrir formulário</button>
+    </form>
+    <p class="hint">Abre na mesma aba para manter sua sessão do Google.</p>
+  </main>
+
+  <script>
+    const BASE = "https://docs.google.com/forms/d/e/1FAIpQLSdgNe0ViWtpMASsPOIDwEE3yqnCuzoVEwQWUgI1-C3PCjM-nQ/viewform?usp=pp_url";
+
+    const FIXOS = [
+      ["entry.901888441", "214677"],
+      ["entry.520656534", "11941998086"],
+      ["entry.1840822347", "Não"],
+      ["entry.1964147847", "PASSEIO"],
+    ];
+
+    function montarUrl(rota) {
+      const campos = FIXOS.concat([["entry.154777964", rota.trim().toUpperCase()]]);
+      const query = campos
+        .map(([chave, valor]) => chave + "=" + encodeURIComponent(valor))
+        .join("&");
+      return BASE + "&" + query;
+    }
+
+    const form = document.getElementById("form");
+    const input = document.getElementById("rota");
+
+    form.addEventListener("submit", function (evento) {
+      evento.preventDefault();
+      const rota = input.value.trim();
+      if (!rota) {
+        input.focus();
+        return;
+      }
+      window.location.href = montarUrl(rota);
+    });
+  </script>
+</body>
+</html>
