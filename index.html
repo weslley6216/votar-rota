@@ -99,18 +99,13 @@
       color: var(--muted);
       cursor: not-allowed;
     }
-    .hint {
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.8rem;
-      margin-top: 16px;
-    }
   </style>
 </head>
 <body>
   <main>
     <h1>🚗 Votar Rota</h1>
-    <p class="sub">Digite a rota e abra o formulário já preenchido.</p>
+    <p class="sub">Abre o formulário preenchido pronto para enviar.</p>
+    
     <form class="card" id="form" autocomplete="off">
       <div>
         <label for="rota">Rota</label>
@@ -119,45 +114,62 @@
           name="rota"
           type="text"
           inputmode="text"
-          placeholder="ex.: 1234"
+          placeholder="ex.: h4, t28"
           autocapitalize="characters"
           autofocus
           required
         >
       </div>
-      <button type="submit" id="botao">Abrir formulário</button>
+      <button type="submit" id="botao">Garantir Rota</button>
     </form>
-    <p class="hint">Abre na mesma aba para manter sua sessão do Google.</p>
   </main>
 
   <script>
+    // URL OFICIAL do seu formulário real
     const BASE = "https://docs.google.com/forms/d/e/1FAIpQLSdgNe0ViWtpMASsPOIDwEE3yqnCuzoVEwQWUgI1-C3PCjM-nQ/viewform?usp=pp_url";
 
+    // Todos os seus dados fixos
     const FIXOS = [
       ["entry.901888441", "214677"],
       ["entry.520656534", "11941998086"],
       ["entry.1840822347", "Não"],
       ["entry.1964147847", "PASSEIO"],
+      ["emailAddress", "eslavaandreia@gmail.com"] 
     ];
 
+    function normalizarRota(valor) {
+      const limpo = valor.trim().toUpperCase();
+      const partes = limpo.match(/^([A-Z]+)\D*(\d+)$/);
+      return partes ? partes[1] + "-" + partes[2] : limpo;
+    }
+
     function montarUrl(rota) {
-      const campos = FIXOS.concat([["entry.154777964", rota.trim().toUpperCase()]]);
+      const campos = FIXOS.concat([["entry.154777964", normalizarRota(rota)]]);
       const query = campos
         .map(([chave, valor]) => chave + "=" + encodeURIComponent(valor))
         .join("&");
-      return BASE + "&" + query;
+      
+      // O "#i43" no final força o navegador a pular direto para a última pergunta!
+      return BASE + "&" + query + "#i43";
     }
 
     const form = document.getElementById("form");
     const input = document.getElementById("rota");
+    const botao = document.getElementById("botao");
 
     form.addEventListener("submit", function (evento) {
       evento.preventDefault();
+      
       const rota = input.value.trim();
+      
       if (!rota) {
         input.focus();
         return;
       }
+
+      botao.textContent = "ABRINDO...";
+      botao.disabled = true;
+
       window.location.href = montarUrl(rota);
     });
   </script>
