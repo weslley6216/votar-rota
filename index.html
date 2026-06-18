@@ -174,15 +174,17 @@
       return partes ? partes[1] + "-" + partes[2] : limpo;
     }
 
-    // Decide o votante pelo prefixo "w" e devolve a rota já normalizada.
+    // Decide o votante e devolve a rota já normalizada.
+    // O "w" inicial só é marcador do Weslley se o que sobra AINDA começa com
+    // letra (ou seja, continua sendo uma rota). Assim:
+    //   wg18 -> Weslley G-18 | ww16 -> Weslley W-16 | w16 -> Andreia W-16
     function interpretarVoto(valor) {
-      let texto = valor.trim();
-      let votante = "andreia";
-      if (/^w/i.test(texto)) {
-        votante = "weslley";
-        texto = texto.slice(1);
+      const texto = valor.trim();
+      const marcador = texto.match(/^w([a-z].*)$/i);
+      if (marcador) {
+        return { votante: "weslley", rota: normalizarRota(marcador[1]) };
       }
-      return { votante, rota: normalizarRota(texto) };
+      return { votante: "andreia", rota: normalizarRota(texto) };
     }
 
     function montarUrl(valor) {
