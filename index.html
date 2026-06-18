@@ -7,6 +7,16 @@
   <link rel="preconnect" href="https://docs.google.com" crossorigin>
   <link rel="dns-prefetch" href="https://docs.google.com">
   <title>Votar Rota</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Votar Rota">
+  <meta name="description" content="Abre o formulário de rota já preenchido, pronto para enviar.">
   <style>
     :root {
       --bg: #0f172a;
@@ -27,8 +37,10 @@
       align-items: center;
       justify-content: center;
       padding: 24px;
+      padding-top: max(24px, env(safe-area-inset-top));
       padding-bottom: max(24px, env(safe-area-inset-bottom));
       min-height: 100%;
+      overscroll-behavior-y: contain;
     }
     main {
       width: 100%;
@@ -62,12 +74,29 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
+    .campo { position: relative; }
+    .limpar {
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--muted);
+    }
+    .limpar:hover { background: #0f1a2e; color: var(--text); }
     input {
       width: 100%;
       font-size: 1.6rem;
       font-weight: 700;
       text-transform: uppercase;
-      padding: 18px 20px;
+      padding: 18px 56px 18px 20px;
       border-radius: 14px;
       border: 2px solid var(--border);
       background: #0b1220;
@@ -108,13 +137,36 @@
       margin-top: 16px;
       line-height: 1.4;
     }
-    p.quem {
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.95rem;
-      font-weight: 600;
+    .votantes {
+      display: flex;
+      gap: 8px;
     }
-    p.quem strong { color: var(--accent); }
+    .votantes .chip { flex: 1; }
+    .fila {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      width: auto;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 2px solid var(--border);
+      background: #0b1220;
+      color: var(--muted);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .chip.atual {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .chip.feita {
+      opacity: 0.45;
+      text-decoration: line-through;
+    }
   </style>
 </head>
 <body>
@@ -125,161 +177,213 @@
     <form class="card" id="form" autocomplete="off">
       <div>
         <label for="rota">Rota</label>
-        <input
-          id="rota"
-          name="rota"
-          type="text"
-          inputmode="text"
-          placeholder="ex.: h4, t28"
-          autocapitalize="characters"
-          required
-        >
+        <div class="campo">
+          <input
+            id="rota"
+            name="rota"
+            type="text"
+            inputmode="text"
+            placeholder="ex.: v1 t2 r4"
+            autocapitalize="characters"
+            required
+          >
+          <button type="button" id="limpar" class="limpar" aria-label="Limpar rotas" hidden>✕</button>
+        </div>
       </div>
-      <p class="quem" id="quem">Voto: <strong>Andreia</strong></p>
+      <div class="fila" id="fila" hidden></div>
+      <div class="votantes" id="votantes">
+        <button type="button" class="chip" data-votante="andreia">Andreia</button>
+        <button type="button" class="chip" data-votante="weslley">Weslley</button>
+      </div>
       <button type="submit" id="botao">Garantir Rota</button>
     </form>
-    <p class="dica" id="dica">A rota fica salva. Toque em <strong>Garantir Rota</strong> pra votar de novo.</p>
+    <p class="dica">Várias rotas separadas por espaço. Ao voltar, a próxima já está pronta — toque no chip pra corrigir a vez. Trocar de votante repete a lista inteira do começo.</p>
   </main>
-
   <script>
-    // URL OFICIAL do seu formulário real
-    const BASE = "https://docs.google.com/forms/d/e/1FAIpQLSdgNe0ViWtpMASsPOIDwEE3yqnCuzoVEwQWUgI1-C3PCjM-nQ/viewform?usp=pp_url";
+    // ---------- Formulário ----------
+    // Notas do comportamento dele, verificadas no navegador em 01/08/2026:
+    // - Coleta o e-mail pela conta Google logada e salva rascunho automático.
+    // - Sem "srd=true" o rascunho vence o prefill: a query é descartada e abre o
+    //   modal "Continuar o rascunho atual?". Com ele, a rota da URL entra direto —
+    //   é o mesmo link que o botão "Continuar" do modal usa.
+    // - A cópia por e-mail não dá pra automatizar: não tem "entry", o parâmetro
+    //   "emailReceipt" é ignorado e nem script na página marca o checkbox.
+    //   Por isso a âncora "#i4" para no título dessa pergunta, e não no Enviar.
+    const FORM = "https://docs.google.com/forms/d/e/1FAIpQLSdgNe0ViWtpMASsPOIDwEE3yqnCuzoVEwQWUgI1-C3PCjM-nQ/viewform";
+    const ANCORA = "#i4";
 
-    // Dados por votante. Sem prefixo = Andreia (padrão).
-    // Prefixo "w" na rota (ex.: wg18) = voto do Weslley.
-    const DADOS = {
-      andreia: [
-        ["entry.901888441", "214677"],            // ID
-        ["entry.520656534", "11941998086"],       // telefone
-        ["emailAddress", "eslavaandreia@gmail.com"],
-      ],
-      weslley: [
-        ["entry.901888441", "2115706"],           // ID
-        ["entry.520656534", "11965391663"],       // telefone
-        ["emailAddress", "weslley.camphos@hotmail.com"],
-      ],
+    const CAMPO = {
+      id: "entry.901888441",
+      rota: "entry.154777964",
+      telefone: "entry.520656534",
     };
 
-    // Iguais para os dois votantes
-    const COMUNS = [
-      ["entry.1840822347", "Não"],
-      ["entry.1964147847", "PASSEIO"],
-    ];
+    const VOTANTES = {
+      andreia: { id: "214677", telefone: "11941998086" },
+      weslley: { id: "2115706", telefone: "11965391663" },
+    };
 
-    const NOMES = { andreia: "Andreia", weslley: "Weslley" };
+    const MEMORIA = { rotas: "votar.rotas", vez: "votar.vez", votante: "votar.votante" };
 
+    // ---------- Elementos ----------
+    const form = document.getElementById("form");
+    const input = document.getElementById("rota");
+    const botao = document.getElementById("botao");
+    const fila = document.getElementById("fila");
+    const votantes = document.getElementById("votantes");
+    const limpar = document.getElementById("limpar");
+
+    // ---------- Estado ----------
+    // "vez" é o índice da rota da vez; quando chega no tamanho da lista, a fila
+    // acabou e o botão passa a oferecer repetir.
+    let vez = 0;
+    let votante = "andreia";
+
+    function lembrar() {
+      localStorage.setItem(MEMORIA.rotas, input.value.trim());
+      localStorage.setItem(MEMORIA.vez, String(vez));
+      localStorage.setItem(MEMORIA.votante, votante);
+    }
+
+    function relembrar() {
+      input.value = localStorage.getItem(MEMORIA.rotas) || "";
+      vez = parseInt(localStorage.getItem(MEMORIA.vez), 10) || 0;
+      votante = localStorage.getItem(MEMORIA.votante) === "weslley" ? "weslley" : "andreia";
+    }
+
+    // ---------- Rotas ----------
+    // "v1 t2, r4" -> ["v1", "t2", "r4"]. Vírgula e espaço servem de separador.
+    function separarRotas(texto) {
+      return texto.trim().split(/[\s,]+/).filter(Boolean);
+    }
+
+    function rotas() {
+      return separarRotas(input.value);
+    }
+
+    // "t2" -> "T-2". Deixa passar o que não casar, pra não inventar rota.
     function normalizarRota(valor) {
       const limpo = valor.trim().toUpperCase();
       const partes = limpo.match(/^([A-Z]+)\D*(\d+)$/);
       return partes ? partes[1] + "-" + partes[2] : limpo;
     }
 
-    // Decide o votante pelo prefixo "w" e devolve a rota já normalizada.
-    function interpretarVoto(valor) {
-      let texto = valor.trim();
-      let votante = "andreia";
-      if (/^w/i.test(texto)) {
-        votante = "weslley";
-        texto = texto.slice(1);
-      }
-      return { votante, rota: normalizarRota(texto) };
+    function montarUrl(rota) {
+      const pessoa = VOTANTES[votante];
+      const query = new URLSearchParams({
+        usp: "pp_url",
+        [CAMPO.id]: pessoa.id,
+        [CAMPO.telefone]: pessoa.telefone,
+        [CAMPO.rota]: normalizarRota(rota),
+        srd: "true",
+      });
+      return FORM + "?" + query + ANCORA;
     }
 
-    function montarUrl(valor) {
-      const { votante, rota } = interpretarVoto(valor);
-      const campos = DADOS[votante]
-        .concat(COMUNS)
-        .concat([["entry.154777964", rota]]);
-      const query = campos
-        .map(([chave, valor]) => chave + "=" + encodeURIComponent(valor))
-        .join("&");
+    // ---------- Desenho ----------
+    function desenharFila(lista) {
+      fila.hidden = lista.length < 2;
+      fila.textContent = "";
+      if (fila.hidden) return;
 
-      // O "#i43" no final força o navegador a pular direto para a última pergunta!
-      return BASE + "&" + query + "#i43";
+      lista.forEach(function (bruta, i) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "chip" + (i < vez ? " feita" : i === vez ? " atual" : "");
+        chip.textContent = normalizarRota(bruta);
+        chip.addEventListener("click", function () {
+          vez = i;
+          lembrar();
+          desenhar();
+        });
+        fila.appendChild(chip);
+      });
     }
 
-    const form = document.getElementById("form");
-    const input = document.getElementById("rota");
-    const botao = document.getElementById("botao");
-    const dica = document.getElementById("dica");
-    const quem = document.getElementById("quem");
+    function desenhar() {
+      const lista = rotas();
+      vez = Math.min(Math.max(vez, 0), lista.length);
 
-    const CHAVE_ROTA = "votar.rota";   // localStorage: dura entre sessões
-    const CHAVE_URL = "votar.url";     // sessionStorage: URL rica da sessão atual
-    const AUTO_MS = 1200;
-    const DICA_PADRAO = 'A rota fica salva. Toque em <strong>Garantir Rota</strong> pra votar de novo.';
+      limpar.hidden = input.value.trim() === "";
+      desenharFila(lista);
 
-    let timerAuto = null;
+      votantes.querySelectorAll("[data-votante]").forEach(function (chip) {
+        chip.classList.toggle("atual", chip.dataset.votante === votante);
+      });
 
-    // Mostra de quem é o voto conforme o prefixo digitado
-    function atualizarQuem() {
-      const { votante, rota } = interpretarVoto(input.value);
-      quem.innerHTML = 'Voto: <strong>' + NOMES[votante] + '</strong>'
-        + (rota ? ' · ' + rota : '');
+      const daVez = lista[vez];
+      botao.textContent = daVez ? "Garantir " + normalizarRota(daVez)
+        : lista.length ? "Repetir fila"
+        : "Garantir Rota";
     }
 
-    // Salva a rota a cada digitação
+    // ---------- Eventos ----------
     input.addEventListener("input", function () {
-      localStorage.setItem(CHAVE_ROTA, input.value.trim());
-      atualizarQuem();
+      vez = 0;
+      lembrar();
+      desenhar();
     });
 
-    // Foca/seleciona = "quero editar": cancela o reabrir automático
     input.addEventListener("focus", function () {
-      cancelarAuto();
       input.select();
     });
 
-    function cancelarAuto() {
-      if (timerAuto) { clearTimeout(timerAuto); timerAuto = null; }
-      botao.textContent = "Garantir Rota";
-      dica.innerHTML = DICA_PADRAO;
-    }
+    limpar.addEventListener("click", function () {
+      input.value = "";
+      vez = 0;
+      lembrar();
+      desenhar();
+      input.focus();
+    });
 
-    function navegar(url) {
-      botao.textContent = "ABRINDO...";
-      window.location.href = url;
-    }
-
-    // Modo "voltar": reusa a URL rica guardada na sessão e reabre o form sozinho
-    function armarRevoto(url) {
-      botao.textContent = "🔁 Votar de novo";
-      dica.innerHTML = 'Reabrindo a rota salva… · <a id="trocar">trocar rota</a>';
-      document.getElementById("trocar").addEventListener("click", cancelarAuto);
-      timerAuto = setTimeout(function () { navegar(url); }, AUTO_MS);
-    }
-
-    // pageshow cobre carga nova e volta via bfcache
-    window.addEventListener("pageshow", function () {
-      if (timerAuto) { clearTimeout(timerAuto); timerAuto = null; }
-      botao.disabled = false;
-
-      const rota = localStorage.getItem(CHAVE_ROTA);
-      if (rota) input.value = rota;
-      atualizarQuem();
-
-      const urlSessao = sessionStorage.getItem(CHAVE_URL);
-      if (urlSessao) {
-        armarRevoto(urlSessao);
-      } else {
-        botao.textContent = "Garantir Rota";
-        dica.innerHTML = DICA_PADRAO;
-      }
+    // Trocar de votante rebobina: o caso de uso é repetir a mesma lista pela
+    // outra pessoa, então ninguém quer continuar do meio.
+    votantes.querySelectorAll("[data-votante]").forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        votante = chip.dataset.votante;
+        vez = 0;
+        lembrar();
+        desenhar();
+      });
     });
 
     form.addEventListener("submit", function (evento) {
       evento.preventDefault();
-      cancelarAuto();
 
-      const bruto = input.value.trim();
-      const { rota } = interpretarVoto(bruto);
-      if (!rota) { input.focus(); return; }
+      const lista = rotas();
+      if (!lista.length) { input.focus(); return; }
 
-      const url = montarUrl(bruto);
-      localStorage.setItem(CHAVE_ROTA, bruto);
-      sessionStorage.setItem(CHAVE_URL, url);   // guarda a URL rica na sessão
-      navegar(url);
+      // Fila terminada: o botão vira "repetir" e só rebobina, sem abrir nada.
+      if (vez >= lista.length) {
+        vez = 0;
+        lembrar();
+        desenhar();
+        return;
+      }
+
+      const daVez = lista[vez];
+      // Avança otimista: ao voltar, a próxima já está engatilhada. Se não chegou
+      // a enviar, é só tocar no chip pra corrigir a vez.
+      vez += 1;
+      lembrar();
+
+      botao.textContent = "ABRINDO...";
+      window.location.href = montarUrl(daVez);
     });
+
+    // pageshow cobre carga nova e volta via bfcache
+    window.addEventListener("pageshow", function () {
+      botao.disabled = false;
+      relembrar();
+      desenhar();
+    });
+
+    // PWA: registra o service worker (shell offline + instalável).
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").catch(function () {});
+      });
+    }
   </script>
 </body>
 </html>
