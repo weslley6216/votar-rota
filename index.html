@@ -125,13 +125,12 @@
           inputmode="text"
           placeholder="ex.: h4, t28"
           autocapitalize="characters"
-          autofocus
           required
         >
       </div>
       <button type="submit" id="botao">Garantir Rota</button>
     </form>
-    <p class="dica">Depois de votar, toque em <strong>voltar</strong> pra cair de novo no formulário já preenchido.</p>
+    <p class="dica" id="dica">A rota fica salva. Toque em <strong>Garantir Rota</strong> pra votar de novo.</p>
   </main>
 
   <script>
@@ -166,43 +165,73 @@
     const form = document.getElementById("form");
     const input = document.getElementById("rota");
     const botao = document.getElementById("botao");
+    const dica = document.getElementById("dica");
 
-    const CHAVE_ROTA = "votar.rota";
+    const CHAVE_ROTA = "votar.rota";   // localStorage: dura entre sessões
+    const CHAVE_URL = "votar.url";     // sessionStorage: URL rica da sessão atual
+    const AUTO_MS = 1200;
+    const DICA_PADRAO = 'A rota fica salva. Toque em <strong>Garantir Rota</strong> pra votar de novo.';
 
-    // Restaura a última rota ao abrir (persiste entre sessões)
-    const rotaSalva = localStorage.getItem(CHAVE_ROTA);
-    if (rotaSalva) input.value = rotaSalva;
+    let timerAuto = null;
 
     // Salva a rota a cada digitação
     input.addEventListener("input", function () {
       localStorage.setItem(CHAVE_ROTA, input.value.trim());
     });
 
-    // Ao voltar pra esta tela (botão voltar / bfcache), deixa tudo pronto de novo
-    window.addEventListener("pageshow", function () {
+    // Foca/seleciona = "quero editar": cancela o reabrir automático
+    input.addEventListener("focus", function () {
+      cancelarAuto();
+      input.select();
+    });
+
+    function cancelarAuto() {
+      if (timerAuto) { clearTimeout(timerAuto); timerAuto = null; }
       botao.textContent = "Garantir Rota";
+      dica.innerHTML = DICA_PADRAO;
+    }
+
+    function navegar(url) {
+      botao.textContent = "ABRINDO...";
+      window.location.href = url;
+    }
+
+    // Modo "voltar": reusa a URL rica guardada na sessão e reabre o form sozinho
+    function armarRevoto(url) {
+      botao.textContent = "🔁 Votar de novo";
+      dica.innerHTML = 'Reabrindo a rota salva… · <a id="trocar">trocar rota</a>';
+      document.getElementById("trocar").addEventListener("click", cancelarAuto);
+      timerAuto = setTimeout(function () { navegar(url); }, AUTO_MS);
+    }
+
+    // pageshow cobre carga nova e volta via bfcache
+    window.addEventListener("pageshow", function () {
+      if (timerAuto) { clearTimeout(timerAuto); timerAuto = null; }
       botao.disabled = false;
-      const salva = localStorage.getItem(CHAVE_ROTA);
-      if (salva) input.value = salva;
+
+      const rota = localStorage.getItem(CHAVE_ROTA);
+      if (rota) input.value = rota;
+
+      const urlSessao = sessionStorage.getItem(CHAVE_URL);
+      if (urlSessao) {
+        armarRevoto(urlSessao);
+      } else {
+        botao.textContent = "Garantir Rota";
+        dica.innerHTML = DICA_PADRAO;
+      }
     });
 
     form.addEventListener("submit", function (evento) {
       evento.preventDefault();
+      cancelarAuto();
 
       const rota = input.value.trim();
+      if (!rota) { input.focus(); return; }
 
-      if (!rota) {
-        input.focus();
-        return;
-      }
-
+      const url = montarUrl(rota);
       localStorage.setItem(CHAVE_ROTA, rota);
-
-      botao.textContent = "ABRINDO...";
-
-      // Mesma aba: navega pro form preenchido. Depois de votar, use o "voltar"
-      // do navegador pra cair de novo no form já preenchido e votar de novo.
-      window.location.href = montarUrl(rota);
+      sessionStorage.setItem(CHAVE_URL, url);   // guarda a URL rica na sessão
+      navegar(url);
     });
   </script>
 </body>
