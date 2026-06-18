@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0f172a">
+  <link rel="preconnect" href="https://docs.google.com" crossorigin>
+  <link rel="dns-prefetch" href="https://docs.google.com">
   <title>Votar Rota</title>
   <style>
     :root {
@@ -99,6 +101,13 @@
       color: var(--muted);
       cursor: not-allowed;
     }
+    p.dica {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 16px;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -122,6 +131,7 @@
       </div>
       <button type="submit" id="botao">Garantir Rota</button>
     </form>
+    <p class="dica">Depois de votar, toque em <strong>voltar</strong> pra cair de novo no formulário já preenchido.</p>
   </main>
 
   <script>
@@ -157,19 +167,41 @@
     const input = document.getElementById("rota");
     const botao = document.getElementById("botao");
 
+    const CHAVE_ROTA = "votar.rota";
+
+    // Restaura a última rota ao abrir (persiste entre sessões)
+    const rotaSalva = localStorage.getItem(CHAVE_ROTA);
+    if (rotaSalva) input.value = rotaSalva;
+
+    // Salva a rota a cada digitação
+    input.addEventListener("input", function () {
+      localStorage.setItem(CHAVE_ROTA, input.value.trim());
+    });
+
+    // Ao voltar pra esta tela (botão voltar / bfcache), deixa tudo pronto de novo
+    window.addEventListener("pageshow", function () {
+      botao.textContent = "Garantir Rota";
+      botao.disabled = false;
+      const salva = localStorage.getItem(CHAVE_ROTA);
+      if (salva) input.value = salva;
+    });
+
     form.addEventListener("submit", function (evento) {
       evento.preventDefault();
-      
+
       const rota = input.value.trim();
-      
+
       if (!rota) {
         input.focus();
         return;
       }
 
-      botao.textContent = "ABRINDO...";
-      botao.disabled = true;
+      localStorage.setItem(CHAVE_ROTA, rota);
 
+      botao.textContent = "ABRINDO...";
+
+      // Mesma aba: navega pro form preenchido. Depois de votar, use o "voltar"
+      // do navegador pra cair de novo no form já preenchido e votar de novo.
       window.location.href = montarUrl(rota);
     });
   </script>
