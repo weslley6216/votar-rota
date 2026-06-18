@@ -108,6 +108,13 @@
       margin-top: 16px;
       line-height: 1.4;
     }
+    p.quem {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    p.quem strong { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -128,6 +135,7 @@
           required
         >
       </div>
+      <p class="quem" id="quem">Voto: <strong>Andreia</strong></p>
       <button type="submit" id="botao">Garantir Rota</button>
     </form>
     <p class="dica" id="dica">A rota fica salva. Toque em <strong>Garantir Rota</strong> pra votar de novo.</p>
@@ -137,14 +145,28 @@
     // URL OFICIAL do seu formulário real
     const BASE = "https://docs.google.com/forms/d/e/1FAIpQLSdgNe0ViWtpMASsPOIDwEE3yqnCuzoVEwQWUgI1-C3PCjM-nQ/viewform?usp=pp_url";
 
-    // Todos os seus dados fixos
-    const FIXOS = [
-      ["entry.901888441", "214677"],
-      ["entry.520656534", "11941998086"],
+    // Dados por votante. Sem prefixo = Andreia (padrão).
+    // Prefixo "w" na rota (ex.: wg18) = voto do Weslley.
+    const DADOS = {
+      andreia: [
+        ["entry.901888441", "214677"],            // ID
+        ["entry.520656534", "11941998086"],       // telefone
+        ["emailAddress", "eslavaandreia@gmail.com"],
+      ],
+      weslley: [
+        ["entry.901888441", "2115706"],           // ID
+        ["entry.520656534", "11965391663"],       // telefone
+        ["emailAddress", "weslley.camphos@hotmail.com"],
+      ],
+    };
+
+    // Iguais para os dois votantes
+    const COMUNS = [
       ["entry.1840822347", "Não"],
       ["entry.1964147847", "PASSEIO"],
-      ["emailAddress", "eslavaandreia@gmail.com"] 
     ];
+
+    const NOMES = { andreia: "Andreia", weslley: "Weslley" };
 
     function normalizarRota(valor) {
       const limpo = valor.trim().toUpperCase();
@@ -152,12 +174,26 @@
       return partes ? partes[1] + "-" + partes[2] : limpo;
     }
 
-    function montarUrl(rota) {
-      const campos = FIXOS.concat([["entry.154777964", normalizarRota(rota)]]);
+    // Decide o votante pelo prefixo "w" e devolve a rota já normalizada.
+    function interpretarVoto(valor) {
+      let texto = valor.trim();
+      let votante = "andreia";
+      if (/^w/i.test(texto)) {
+        votante = "weslley";
+        texto = texto.slice(1);
+      }
+      return { votante, rota: normalizarRota(texto) };
+    }
+
+    function montarUrl(valor) {
+      const { votante, rota } = interpretarVoto(valor);
+      const campos = DADOS[votante]
+        .concat(COMUNS)
+        .concat([["entry.154777964", rota]]);
       const query = campos
         .map(([chave, valor]) => chave + "=" + encodeURIComponent(valor))
         .join("&");
-      
+
       // O "#i43" no final força o navegador a pular direto para a última pergunta!
       return BASE + "&" + query + "#i43";
     }
@@ -166,6 +202,7 @@
     const input = document.getElementById("rota");
     const botao = document.getElementById("botao");
     const dica = document.getElementById("dica");
+    const quem = document.getElementById("quem");
 
     const CHAVE_ROTA = "votar.rota";   // localStorage: dura entre sessões
     const CHAVE_URL = "votar.url";     // sessionStorage: URL rica da sessão atual
@@ -174,9 +211,17 @@
 
     let timerAuto = null;
 
+    // Mostra de quem é o voto conforme o prefixo digitado
+    function atualizarQuem() {
+      const { votante, rota } = interpretarVoto(input.value);
+      quem.innerHTML = 'Voto: <strong>' + NOMES[votante] + '</strong>'
+        + (rota ? ' · ' + rota : '');
+    }
+
     // Salva a rota a cada digitação
     input.addEventListener("input", function () {
       localStorage.setItem(CHAVE_ROTA, input.value.trim());
+      atualizarQuem();
     });
 
     // Foca/seleciona = "quero editar": cancela o reabrir automático
@@ -211,6 +256,7 @@
 
       const rota = localStorage.getItem(CHAVE_ROTA);
       if (rota) input.value = rota;
+      atualizarQuem();
 
       const urlSessao = sessionStorage.getItem(CHAVE_URL);
       if (urlSessao) {
@@ -225,11 +271,12 @@
       evento.preventDefault();
       cancelarAuto();
 
-      const rota = input.value.trim();
+      const bruto = input.value.trim();
+      const { rota } = interpretarVoto(bruto);
       if (!rota) { input.focus(); return; }
 
-      const url = montarUrl(rota);
-      localStorage.setItem(CHAVE_ROTA, rota);
+      const url = montarUrl(bruto);
+      localStorage.setItem(CHAVE_ROTA, bruto);
       sessionStorage.setItem(CHAVE_URL, url);   // guarda a URL rica na sessão
       navegar(url);
     });
