@@ -372,10 +372,17 @@
     });
 
     // pageshow cobre carga nova e volta via bfcache
+    // No iOS Safari, ler localStorage cedo demais no carregamento da página
+    // desconecta a API do storage persistente pelo resto da vida da página
+    // (WebKit bug 199929): a leitura/escrita parece funcionar, mas nunca é
+    // salva em disco — daí a fila de rotas "sumir" ao voltar do formulário.
+    // Um atraso mínimo evita cair nessa janela; Android/Chrome não tem o bug.
     window.addEventListener("pageshow", function () {
-      botao.disabled = false;
-      relembrar();
-      desenhar();
+      setTimeout(function () {
+        botao.disabled = false;
+        relembrar();
+        desenhar();
+      }, 50);
     });
 
     // PWA: registra o service worker (shell offline + instalável).
